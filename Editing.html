@@ -1,1 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Encrypt X Editor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at center, rgba(0,0,0,0.75) 0%, rgba(2,6,23,0.95) 100%),
+      url("https://raw.githubusercontent.com/ScriptObfuscator2/Website/refs/heads/main/Dark%20Theme%20With%20Light%20Bulb.jpeg");
+    background-size: cover;
+    background-position: center;
+    font-family: "Courier New", monospace;
+    display: flex;
+    justify-content: center;
+    align-items: top;
+    padding: 0px;
+  }
+
+  .container {
+    width: min(95%, 1000px);
+    background: rgba(15, 23, 42, 0.85);
+    border: 2px solid #334155;
+    border-radius: 12px;
+    padding: 15px;
+  }
+
+  /* 🔥 TOP BAR */
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    gap: 10px;
+  }
+
+  button {
+    padding: 10px 18px;
+    background: #ef4444;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+  }
+
+  .key-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .key-box label {
+    font-size: 12px;
+    color: #94a3b8;
+  }
+
+  .key-box input {
+    width: 80%;
+    padding: 8px;
+    background: rgba(2,6,23,0.9);
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-size: 12px;
+    outline: none;
+  }
+
+  /* EDITOR */
+  .editor {
+    display: flex;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    overflow: hidden;
+    height: 92%;
+    background: rgba(2,6,23,0.9);
+  }
+
+  .lines {
+    padding: 0;
+    text-align: right;
+    color: #64748b;
+    background: rgba(15, 23, 42, 0.6);
+    font-size: 13px;
+    line-height: 20px;
+    overflow: hidden;
+    min-width: 10px;
+    border-right: 1px solid #334155;
+  }
+
+  textarea {
+    flex: 1;
+    padding: 10px;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #e2e8f0;
+    font-size: 13px;
+    line-height: 20px;
+    resize: none;
+    overflow: auto;
+    white-space: pre;
+  }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <!-- 🔥 TOP BAR -->
+  <div class="topbar">
+    <button onclick="saveFile()">Save</button>
+
+    <div class="key-box">
+      <label>Key:</label>
+      <input type="text" id="keyInput" placeholder="Your Key">
+    </div>
+  </div>
+
+  <!-- EDITOR -->
+  <div class="editor">
+    <div class="lines" id="lines"></div>
+    <textarea id="code" oninput="updateLines()" onscroll="syncScroll()"></textarea>
+  </div>
+
+</div>
+
+<script>
+// Get Script Data Function
+async function GetScriptData(id) {
+  let res = await fetch(`https://proxy.2677929.xyz/https://github.com/ScriptObfuscator2/Scripts/blob/main/${id}`);
+  let text = await res.text();
+  const startString = '"rawLines":["';
+  const endString = '"],"stylingDirectives"';
+  const startIndex = text.indexOf(startString);
+  const endIndex = text.indexOf(endString);
+  text = text.substring(startIndex + startString.length, endIndex);
+  text = text.split("\\").join("");
+  text = JSON.parse(text);
+  return text;
+}
+
+// Update Script Data Function
+async function UpdateScript(auth, script) {
+  const params = new URLSearchParams(window.location.search);
+  const scriptId = params.get("Id");
+  const key = params.get("auth");
+  if (!key || !scriptId) return;
+  try {
+    const res = await fetch(`https://encrypt-x.scriptobfuscator2.workers.dev/edit?Id=${scriptId}&auth=${key}`, {
+      method: "PUT",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        auth: auth,
+        script: script
+      })
+    });
+    const result = await res.text();
+    return result;
+  } catch (err) {
+    console.log("ERROR:", err);
+    alert(err);
+    return;
+  }
+}
+  
+(async () => {
+  setUIEnabled(false);
+  const params = new URLSearchParams(window.location.search);
+  const currentId = params.get("Id");
+  const key = params.get("auth");
+  if (!currentId || !key) return;
+  try {
+    const json = await GetScriptData(currentId);
+    // Detect if Id is not accessable
+    if (json && !json.auth) {
+      window.location.replace(`https://encrypt-x.pages.dev/Scripts?Id=${currentId}`);
+    }
+    const res = await fetch(`https://encrypt-x.scriptobfuscator2.workers.dev/check?Id=${currentId}&auth=${key}`);
+    const json2 = await res.json();
+    if (json2.correct === true) {
+      document.getElementById("keyInput").value = json2.auth;
+      document.getElementById("code").value = json2.Script;
+      setUIEnabled(true);
+    }
+  } catch (err) {
+    console.log("ERROR:", err);
+  }
+})();
+
+function setUIEnabled(state) {
+  document.getElementById("code").disabled = !state;
+  document.getElementById("keyInput").disabled = !state;
+  document.querySelector("button").disabled = !state;
+}
+  
+function updateLines() {
+  const textarea = document.getElementById("code");
+  const lines = textarea.value.split("\n").length;
+
+  let text = "";
+  for (let i = 1; i <= lines; i++) {
+    text += i + "\n";
+  }
+
+  document.getElementById("lines").innerText = text;
+
+  const digits = String(lines).length;
+  document.getElementById("lines").style.width = (digits * 6 + 10) + "px";
+}
+
+function syncScroll() {
+  const textarea = document.getElementById("code");
+  const lines = document.getElementById("lines");
+  lines.scrollTop = textarea.scrollTop;
+}
+
+async function saveFile() {
+  setUIEnabled(false);
+  const params = new URLSearchParams(window.location.search);
+  const currentId = params.get("Id");
+  const code = document.getElementById("code").value;
+  const key = document.getElementById("keyInput").value;
+
+  console.log("Code:", code);
+  console.log("Key:", key);
+
+  if (!key || key === "") {
+    alert("Key Can't be Empty");
+    setUIEnabled(true);
+    return;
+  }
+  
+  const res = await UpdateScript(key, code);
+  if (res.includes("LastUpdate")) {
+    alert("Saved");
+    window.open("https://www.profitablecpmratenetwork.com/vhh2expv?key=c2ad93e2c455a2301f32fde465599195"); // smartlink Ad
+    setUIEnabled(true);
+    // replace auth key in url without redirecting
+    const url = new URL(window.location.href);
+    url.searchParams.set("auth", key);
+    history.replaceState(null, "", url);
+  } else {
+    alert(res);
+  }
+}
+
+const keyInput = document.getElementById("keyInput");
+keyInput.addEventListener("input", () => {
+  keyInput.value = keyInput.value.replace(/[^a-zA-Z0-9]/g, "");
+});
+  
+</script>
+
+</body>
+</html>
